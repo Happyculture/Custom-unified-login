@@ -1,0 +1,5 @@
+name = Custom lofin
+description = Unified login/register form
+package = Custom
+dependencies[] = ctools_automodal
+core = 7.x

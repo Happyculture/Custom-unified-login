@@ -1,0 +1,128 @@
+<?php
+
+/**
+ * Implements hook_menu()
+ */
+function custom_login_menu() {
+  $items = array();
+
+  $items['custom-login'] = array(
+    'title' => 'Signup',
+    'page callback' => 'custom_login_unified_login_page',
+    'access callback' => 'user_is_anonymous',
+    'type' => MENU_NORMAL_ITEM,
+    'modal' => TRUE,
+    'menu_name' => 'user-menu',
+  );
+
+  return $items;
+}
+
+/**
+ * Menu callback for user/login creates a unified login/registration form.
+ * Inspired by logintobbogan's logintoboggan_unified_login_page().
+ * @see logintoboggan_unified_login_page()
+ */
+function custom_login_unified_login_page() {
+  global $user;
+  $ajax = FALSE;
+
+  if (substr(request_path(), -5) == '/ajax') {
+    $ajax = 'ajax';
+  }
+
+  // User is logged in already.
+  if ($user->uid) {
+    if ($ajax) {
+      $commands[] = ctools_modal_command_dismiss();
+      $commands[] = ctools_ajax_command_redirect('<front>');
+      print ajax_render($commands);
+      exit();
+    }
+    else {
+      drupal_goto('<front>');
+    }
+  }
+
+  // User is not logged in.
+  if ($ajax) {
+    ctools_include('modal');
+    ctools_include('ajax');
+    ctools_add_js('ajax-responder');
+
+    $form_state_1 = $form_state_2 = array(
+      'ajax' => $ajax,
+      'build_info' => array('args' => array()),
+      're_render' => FALSE,
+      'no_redirect' => TRUE,
+    );
+
+    $login_form = drupal_build_form('user_login', $form_state_1);
+
+    // Build the second form only when the first form isnt executed. Otherwise
+    // we will be redirected, because both form builders contains drupal_goto()
+    // for already logged-in users.
+    if (empty($form_state_1['executed'])) {
+      $register_form = drupal_build_form('user_register_form', $form_state_2);
+    }
+
+    // Handle submitted form.
+    if (!empty($form_state_1['executed']) || !empty($form_state_2['executed'])) {
+      $commands[] = ctools_modal_command_dismiss();
+      $commands[] = ctools_ajax_command_reload();
+
+      print ajax_render($commands);
+      exit();
+    }
+
+    // If there are messages for the form, render them.
+    if ($messages = theme('status_messages')) {
+      $messages = '<div class="messages">' . $messages . '</div>';
+    }
+
+    $variables = array(
+      'login_form' => drupal_render($login_form),
+      'register_form' => drupal_render($register_form),
+    );
+
+    return $messages . theme('custom_login_unified_login_page', $variables);
+  }
+  else {
+    $login_form = drupal_get_form('user_login');
+    $register_form = drupal_get_form('user_register_form');
+    $rendered_login_form = drupal_render($login_form);
+    $rendered_register_form = drupal_render($register_form);
+    $variables = array(
+      'login_form' => $rendered_login_form,
+      'register_form' => $rendered_register_form,
+    );
+    return theme('custom_login_unified_login_page', $variables);
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function custom_login_theme($existing, $type, $theme, $path) {
+  return array(
+    'custom_login_unified_login_page' => array(
+      'variables' => array(
+        'login_form' => NULL,
+        'register_form' => NULL,
+      ),
+    ),
+  );
+}
+
+/**
+ * Theme function for unified login page.
+ * @see theme_lt_unified_login_page()
+ */
+function theme_custom_login_unified_login_page($variables) {
+  $output = '';
+  // Add the login and registration forms in.
+  $output .= '<div id="register-form">' . $variables['register_form'] . '</div>';
+  $output .= '<div id="login-form">' . $variables['login_form'] . '</div>';
+
+  return $output;
+}
